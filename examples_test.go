@@ -109,7 +109,7 @@ func ExampleStubQueryError() {
 
 	sql := "select count(*) from error"
 
-	StubQueryError(sql, errors.New("test error"))
+	StubQuery(sql, errors.New("test error"))
 
 	_, err := db.Query(sql)
 
@@ -199,12 +199,12 @@ func ExampleSetQueryWithArgsFunc() {
 	// joe - 25
 }
 
-type testResult struct{
-	lastId int64
+type testResult struct {
+	lastId       int64
 	affectedRows int64
 }
 
-func (r testResult) LastInsertId() (int64, error){
+func (r testResult) LastInsertId() (int64, error) {
 	return r.lastId, nil
 }
 

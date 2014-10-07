@@ -31,6 +31,11 @@ type query struct {
 	err    error
 }
 
+type queries struct {
+	queries []query
+	pos     int
+}
+
 func newDriver() *testDriver {
 	return &testDriver{
 		conn:              newConn(),
@@ -85,17 +90,32 @@ func SetQueryWithArgsFunc(f func(query string, args []driver.Value) (result driv
 }
 
 // Stubs the global driver.Conn to return the supplied driver.Rows when db.Query() is called, query stubbing is case insensitive, and whitespace is also ignored.
-func StubQuery(q string, rows driver.Rows) {
-	d.conn.queries[getQueryHash(q)] = query{
-		rows: rows,
+func StubQuery(q string, r ...interface{}) {
+	hash := getQueryHash(q)
+
+	if d.conn.queries[hash] == nil {
+		d.conn.queries[hash] = &queries{}
+	}
+
+	for _, rs := range r {
+		qr := query{}
+
+		switch rs.(type) {
+		case driver.Rows:
+			qr.rows = rs.(driver.Rows)
+		case error:
+			qr.err = rs.(error)
+		default:
+			panic("invalid value for stub result")
+		}
+
+		d.conn.queries[hash].queries = append(d.conn.queries[hash].queries, qr)
 	}
 }
 
 // Stubs the global driver.Conn to return the supplied error when db.Query() is called, query stubbing is case insensitive, and whitespace is also ignored.
 func StubQueryError(q string, err error) {
-	d.conn.queries[getQueryHash(q)] = query{
-		err: err,
-	}
+	StubQuery(q, err)
 }
 
 // Set your own function to be executed when db.Open() is called. You can either hand back a valid connection, or an error. Conn() can be used to grab the global Conn object containing stubbed queries.
@@ -116,15 +136,32 @@ func SetExecWithArgsFunc(f func(query string, args []driver.Value) (driver.Resul
 }
 
 // Stubs the global driver.Conn to return the supplied Result when db.Exec is called, query stubbing is case insensitive, and whitespace is also ignored.
-func StubExec(q string, r *Result) {
-	d.conn.queries[getQueryHash(q)] = query{
-		result: r,
+func StubExec(q string, r ...interface{}) {
+	hash := getQueryHash(q)
+
+	if d.conn.queries[hash] == nil {
+		d.conn.queries[hash] = &queries{}
+	}
+
+	for _, rs := range r {
+		qr := query{}
+
+		switch rs.(type) {
+		case *Result:
+			qr.result = rs.(*Result)
+		case error:
+			qr.err = rs.(error)
+		default:
+			panic("invalid value for stub result")
+		}
+
+		d.conn.queries[hash].queries = append(d.conn.queries[hash].queries, qr)
 	}
 }
 
 // Stubs the global driver.Conn to return the supplied error when db.Exec() is called, query stubbing is case insensitive, and whitespace is also ignored.
 func StubExecError(q string, err error) {
-	StubQueryError(q, err)
+	StubExec(q, err)
 }
 
 // Clears all stubbed queries, and replaced functions.

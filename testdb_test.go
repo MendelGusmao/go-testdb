@@ -65,6 +65,48 @@ func TestStubQuery(t *testing.T) {
 	}
 }
 
+func TestStubQueryExhaustion(t *testing.T) {
+	defer Reset()
+
+	db, _ := sql.Open("testdb", "")
+
+	sql := "select count(*) from foo"
+	columns := []string{"count"}
+	result := `
+  5
+  `
+	StubQuery(sql, RowsFromCSVString(columns, result))
+
+	res, err := db.Query(sql)
+
+	if err != nil {
+		t.Fatal("stubbed query should not return error")
+	}
+
+	if res.Next() {
+		var count int64
+		err = res.Scan(&count)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if count != 5 {
+			t.Fatal("failed to return count")
+		}
+	}
+
+	res, err = db.Query(sql)
+
+	if err == nil {
+		t.Fatal("failed to return error from stubbed query")
+	}
+
+	if res != nil {
+		t.Fatal("result should be nil on error")
+	}
+}
+
 func TestStubQueryAdditionalWhitespace(t *testing.T) {
 	defer Reset()
 
@@ -151,9 +193,39 @@ func TestStubQueryError(t *testing.T) {
 
 	sql := "select count(*) from error"
 
-	StubQueryError(sql, errors.New("test error"))
+	StubQuery(sql, errors.New("test error"))
 
 	res, err := db.Query(sql)
+
+	if err == nil {
+		t.Fatal("failed to return error from stubbed query")
+	}
+
+	if res != nil {
+		t.Fatal("result should be nil on error")
+	}
+}
+
+func TestStubQueryErrorExhaustion(t *testing.T) {
+	defer Reset()
+
+	db, _ := sql.Open("testdb", "")
+
+	sql := "select count(*) from error"
+
+	StubQuery(sql, errors.New("test error"))
+
+	res, err := db.Query(sql)
+
+	if err == nil {
+		t.Fatal("failed to return error from stubbed query")
+	}
+
+	if res != nil {
+		t.Fatal("result should be nil on error")
+	}
+
+	res, err = db.Query(sql)
 
 	if err == nil {
 		t.Fatal("failed to return error from stubbed query")
@@ -171,7 +243,7 @@ func TestStubQueryRowError(t *testing.T) {
 
 	sql := "select count(*) from error"
 
-	StubQueryError(sql, errors.New("test error"))
+	StubQuery(sql, errors.New("test error"))
 
 	row := db.QueryRow(sql)
 	var count int64
@@ -324,7 +396,7 @@ func TestReset(t *testing.T) {
 	sql.Open("testdb", "")
 
 	sql := "select count(*) from error"
-	StubQueryError(sql, errors.New("test error"))
+	StubQuery(sql, errors.New("test error"))
 
 	Reset()
 
@@ -360,38 +432,6 @@ func TestStubQueryRow(t *testing.T) {
 
 	if count != 5 {
 		t.Fatal("failed to return count")
-	}
-}
-
-func TestStubQueryRowReuse(t *testing.T) {
-	defer Reset()
-
-	db, _ := sql.Open("testdb", "")
-
-	sql := "select count(*) from foo"
-	columns := []string{"count"}
-	result := `
-  5
-  `
-	StubQuery(sql, RowsFromCSVString(columns, result))
-
-	i := 0
-	rows, _ := db.Query(sql)
-	for rows.Next() {
-		i++
-	}
-	if i != 1 {
-		t.Fatal("stub query should have returned one row")
-	}
-
-	j := i
-	moreRows, _ := db.Query(sql)
-	for moreRows.Next() {
-		j++
-	}
-
-	if i == j {
-		t.Fatal("stub query did not return another set of rows")
 	}
 }
 
@@ -474,6 +514,16 @@ func TestStubExec(t *testing.T) {
 	if affected != 3 || err.Error() != "rows affected error" {
 		t.Fatal("stubbed exec did not return expected result")
 	}
+
+	res, err = db.Exec(sql)
+
+	if err == nil {
+		t.Fatal("failed to return error from stubbed query")
+	}
+
+	if res != nil {
+		t.Fatal("result should be nil on error")
+	}
 }
 
 func TestStubExecError(t *testing.T) {
@@ -482,7 +532,7 @@ func TestStubExecError(t *testing.T) {
 	db, _ := sql.Open("testdb", "")
 
 	query := "INSERT INTO foo SET (foo) VALUES (bar)"
-	StubExecError(query, errors.New("request failed"))
+	StubExec(query, errors.New("request failed"))
 
 	res, err := db.Exec(query)
 
